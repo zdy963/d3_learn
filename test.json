@@ -1,0 +1,170 @@
+{
+  "nodes":
+          [{
+            "name": "微众银行",
+            "id": 0,
+            "type": 0
+          },
+            {
+              "name": "顾敏",
+              "id": 1,
+              "type": 2
+            },
+            {
+              "name": "腾讯",
+              "id": 2,
+              "type": 1
+            },
+            {
+              "name": "武捷思",
+              "id": 3,
+              "type": 2
+            },
+            {
+              "name": "周永健",
+              "id": 4,
+              "type": 2
+            },
+            {
+              "name": "光汇石油",
+              "id": 5,
+              "type": 1
+            },
+            {
+              "name": "信太科技",
+              "id": 6,
+              "type": 1
+            },
+            {
+              "name": "黄宇铮",
+              "id": 7,
+              "type": 2
+            },
+            {
+              "name": "樊扬",
+              "id": 8,
+              "type": 2
+            },
+            {
+              "name": "黄黎明",
+              "id": 9,
+              "type": 2
+            },
+            {
+              "name": "林景华",
+              "id": 10,
+              "type": 2
+            },
+            {
+              "name": "淳永投资",
+              "id": 11,
+              "type": 1
+            },
+            {
+              "name": "腾讯计算机",
+              "id": 12,
+              "type": 1
+            },
+            {
+              "name": "世纪凯旋",
+              "id": 13,
+              "type": 1
+            },
+            {
+              "name": "微众金融科技",
+              "id": 14,
+              "type": 1
+            },
+            {
+              "name": "周邵钦",
+              "id": 15,
+              "type": 2
+            }],
+  "links":
+          [{
+            "source": 1,
+            "target": 0,
+            "relationship": "法人"
+          },
+            {
+              "source": 1,
+              "target": 0,
+              "relationship": "董事长"
+            },
+            {
+              "source": 2,
+              "target": 0,
+              "relationship": "参股"
+            },
+            {
+              "source": 0,
+              "target": 3,
+              "relationship": "董事"
+            },
+            {
+              "source": 0,
+              "target": 4,
+              "relationship": "董事"
+            },
+            {
+              "source": 0,
+              "target": 5,
+              "relationship": "参股"
+            },
+            {
+              "source": 0,
+              "target": 6,
+              "relationship": "参股"
+            },
+            {
+              "source": 0,
+              "target": 7,
+              "relationship": "董事"
+            },
+            {
+              "source": 0,
+              "target": 8,
+              "relationship": "董事"
+            },
+            {
+              "source": 0,
+              "target": 9,
+              "relationship": "董事"
+            },
+            {
+              "source": 0,
+              "target": 10,
+              "relationship": "董事"
+            },
+            {
+              "source": 0,
+              "target": 11,
+              "relationship": "参股"
+            },
+            {
+              "source": 2,
+              "target": 14,
+              "relationship": "参股"
+            },
+            {
+              "source": 12,
+              "target": 2,
+              "relationship": "参股"
+            },
+            {
+              "source": 13,
+              "target": 2,
+              "relationship": "参股"
+            },
+            {
+              "source": 15,
+              "target": 2,
+              "relationship": "监事"
+            },
+            {
+              "source": 1,
+              "target": 0,
+              "relationship": "总经理"
+            }
+          ]
+}
