@@ -43,7 +43,7 @@
 
     $(document).on("click",function (d) {
         if(d.target.nodeName == "svg"){
-            $(".node, .link, .node_text, .link_text")
+            $(".node, .link, .node_text, .link_text, g")
                 .attr("opacity",1)
                 .removeClass("selected");
         }
@@ -51,6 +51,8 @@
 
     var width = 960,
         height = 800,
+        radius = 30,
+        parallelDistance = 12,
         root;
 
     var force = d3.layout.force()
@@ -79,8 +81,6 @@
 
         links = linkcount(links);
         console.log(links);
-        // links = calcTranslationApproximate(links);
-        // console.log(document.getElementById("g1").getBBox());
 
         // 启动force layout
         force
@@ -117,15 +117,6 @@
         link = link.data(links);
         link.exit().remove();
         link.enter()
-        //     .insert("line", ".node")
-        //     .attr("class", "link")
-        //     .attr("x1", function(d) {
-        //         // console.log(d.source.x);
-        //         return d.source.x; })     // x-cor of source point
-        //     .attr("y1", function(d) { return d.source.y; })     // y-cor of source point
-        //     .attr("x2", function(d) { return d.target.x; })
-        //     .attr("y2", function(d) { return d.target.y; })
-        //     .attr("pointer-events", "none");
             .append("path")
             .attr("class", "link")
             .attr("marker-end",function(d,i){
@@ -134,8 +125,8 @@
                     .attr("markerUnits","userSpaceOnUse")
                     .attr("markerWidth","16")
                     .attr("markerHeight","15")
-                    .attr("viewBox","0 0 12 12")
-                    .attr("refX",9)
+                    .attr("viewBox","0 0 10 10")
+                    .attr("refX", radius)
                     .attr("refY",6)
                     .attr("orient","auto")
                     .append("svg:path")
@@ -148,6 +139,29 @@
             });
 
 
+        // 在链上写结点间的关系
+        link_text = link_text.data(links);
+        link_text.exit().remove();
+        link_text.enter()
+            .append("svg:g")
+            .attr("fill-opacity",1);
+        // 增加文本
+        link_text.append("svg:text")
+            .attr("class", "link_text")
+            // .attr("y", ".31em")
+            .attr("text-anchor", "middle")
+            .attr("pointer-events", "none")
+            .attr("dominant-baseline", "middle")
+            .text(function(d){ return d.relationship });
+        // 增加背景白块
+        link_text.insert('rect', 'text')
+            .attr('width', function(d){ return d.relationship.length*12 })
+            .attr('height', function(d){ return 12 })
+            .attr("y", "-.5em")
+            .attr('x', function (d) { return -d.relationship.length*12/2 })
+            .style('fill', '#FFFFFF');
+
+
         // 结点
         node = node.data(nodes, function(d) { return d.id }).style("fill", color);
         node.exit().remove();
@@ -157,23 +171,10 @@
             // .attr("class", "rect")
             .attr("cx", function(d) { return d.x; })    // cx define the x-axis of a center point
             .attr("cy", function(d) { return d.y; })    // cy define the y-axis ..
-            .attr("r", function(d) { return Math.sqrt(d.size) || 45; })   // define the radius
+            .attr("r", radius)   // define the radius
             .style("fill", color)
             .on("click", click)
             .call(node_drag);
-
-
-        // 在链上写结点间的关系
-        link_text = link_text.data(links);
-        link_text.exit().remove();
-        link_text.enter()
-            .append("text")
-            .attr("class", "link_text")
-            .attr("text-anchor", "middle")
-            .attr("pointer-events", "none")
-            .text(function (d) {
-                return d.relationship;
-            });
 
 
         // 在结点上写名字
@@ -192,42 +193,66 @@
             });
     }
 
-    // 使结点位置可动的关键代码
-    function tick() {
-        // console.log(link);
-        // link.attr("x1", function(d) { return d.source.x; })
-        //     .attr("y1", function(d) { return d.source.y; })
-        //     .attr("x2", function(d) { return d.target.x; })
-        //     .attr("y2", function(d) { return d.target.y; });
-        link.attr("d", function(d) {
+    function multiLinks(d) {
+        if(d.linknum === 0){
+            d.minRadius = radius;
+            // 保存起止坐标，用于改变文字方向
+            d.x_start = d.source.x;
+            d.y_start = d.source.y;
+            d.x_end = d.target.x;
+            d.y_end = d.target.y;
+            return 'M' + d.source.x + ' ' + d.source.y
+                    + ' L '+ d.target.x +' '+d.target.y;
+        }
+        else {
+            // x0,y0为起点坐标，x1,y1为终点坐标，x2,y2为所求点坐标
             let x0 = d.source.x,
                 y0 = d.source.y,
                 x1 = d.target.x,
                 y1 = d.target.y,
                 x1_x0 = x1 - x0,
                 y1_y0 = y1 - y0,
-                x2_x0, y2_y0,
-                distance = 12;
-            // console.log(link);
-            if (y1_y0 === 0 || Math.abs(x1_x0 / y1_y0) > 1) {
-                y2_y0 = -distance;
-                x2_x0 = distance * y1_y0 / x1_x0;
+                x2_x0, y2_y0;
+
+            // 更新收尾坐标，减去半径
+            d.minRadius = Math.sqrt(radius*radius - parallelDistance*parallelDistance);
+
+            if (y1_y0 === 0) {
+                x2_x0 = 0;
+                y2_y0 = parallelDistance;
             } else {
-                x2_x0 = distance;
-                y2_y0 = distance * -x1_x0 / y1_y0;
+                let angle = Math.atan((x1_x0) / (y1_y0));
+                x2_x0 = -parallelDistance * Math.cos(angle);
+                y2_y0 = parallelDistance * Math.sin(angle);
             }
+            // 计算平行线起止点坐标
             let xs = x2_x0 * d.linknum + x0,
                 ys = y2_y0 * d.linknum + y0,
                 xt = x2_x0 * d.linknum + x1,
                 yt = y2_y0 * d.linknum + y1;
-            return 'M'+xs+' '+ys+' L '+ xt +' '+yt;
-        });
 
+            // 保存起止坐标，用于改变文字方向
+            d.x_start = xs;
+            d.y_start = ys;
+            d.x_end = xt;
+            d.y_end = yt;
+
+            return 'M'+xs+' '+ys+' L '+ xt +' '+yt;
+        }
+    }
+
+    // 使结点位置可动的关键代码
+    function tick() {
+        // 允许两点间多条连线
+        link.attr("d", function(d){ return multiLinks(d) });
         node.attr("cx", function(d) { return d.x; })
             .attr("cy", function(d) { return d.y; });
 
-        link_text.attr("x", function (d) { return (d.source.x + d.target.x)/2 })
-            .attr("y",function (d) { return (d.source.y + d.target.y)/2 });
+        link_text
+            .attr("transform", function (d) {   // 方向转至与连线相同
+                return "translate(" + (d.x_start + d.x_end)/2 + "," + (d.y_start + d.y_end)/2 + ")" // 移动文字至连线中间
+                    + " rotate(" + Math.atan((d.y_end - d.y_start) / (d.x_end - d.x_start)) * 180 / Math.PI + ")";  // 旋转文字与连线方向一致
+            });
 
         node_text.attr("x", function (d) { return d.x })
             .attr("y", function (d) { return d.y })
@@ -275,13 +300,6 @@
         }
     }
 
-    // 禁止拖拽
-    function dragstop(d, i) {
-        d.fixed = true;
-        tick();
-
-    }
-
     // 给link排序，先按source 再按target
     function sort_links(links) {
         links.sort(function(a,b) {
@@ -304,19 +322,17 @@
                         links[i].target == links[i-1].target)
             {
                 links[i].linknum = links[i-1].linknum + 1;
-                links[i-1].linknum = links[i].linknum
             }
             else {
-                links[i].linknum = 1;
-                if(i>1 && links[i-1].linknum>1){
+                links[i].linknum = 0;
+                if(i > 1 && links[i-1].linknum > 0){
                     // 更新上群结点信息
-                    let mid_num = (links[i-1].linknum-1)/2;
-                    let ir = links[i-1].linknum;
+                    let mid_num = (links[i-1].linknum)/2;
+                    let ir = links[i-1].linknum + 1;
                     for(let j = 0; j < ir; j++){
                         links[i-1-j].linknum = mid_num - j
                     }
                 }
-                console.log(links)
             }
         }
         if(links[links.length-1].linknum>1){
@@ -328,73 +344,4 @@
         }
         return links
     }
-
-    // 对于同结点间的多条边，重新计算起止坐标
-    function calcTranslationApproximate(links, targetDistance=2) {
-        for (let i = 0; i < links.length; i++) {
-            // 当两个结点中有多条边时
-            if (links[i].linknum > 1) {
-                let linknum = links[i].linknum;
-
-                // 偶数个边时
-                if (linknum % 2 === 0) {
-                    console.log('偶数');
-                    let center_link = linknum / 2;
-
-                    for (let j = 0; j < links[i].linknum; j++) {
-                        let gap = Math.min(center_link - j + 1, j + 1 - center_link + 1) * targetDistance;
-                        let new_node = parallel_node(links[i], gap);
-                        // console.log(new_node);
-                        links[i + j].source.x = new_node.source.x;
-                        links[i + j].source.y = new_node.source.y;
-                        links[i + j].target.x = new_node.target.x;
-                        links[i + j].target.y = new_node.target.y;
-                    }
-                    i = i + links[i].linknum - 1;
-                }
-                // 奇数条边时
-                else {
-                    console.log("奇数");
-                    let center_link = Math.ceil(linknum / 2);
-
-                    for (let j = 0; j < links[i].linknum; j++) {
-                        let gap = Math.abs(center_link - j + 1) * targetDistance;
-                        let new_node = parallel_node(links[i], gap);
-                        links[i + j].source.x = new_node.source.x;
-                        links[i + j].source.y = new_node.source.y;
-                        links[i + j].target.x = new_node.target.x;
-                        links[i + j].target.y = new_node.target.y;
-                    }
-                    i = i + links[i].linknum - 1;
-                }
-            }
-        }
-        console.log(links);
-        return links;
-
-        function parallel_node(link, distance) {
-            let x0 = link.source.x,
-                y0 = link.source.y,
-                x1 = link.target.x,
-                y1 = link.target.y,
-                x1_x0 = x1 - x0,
-                y1_y0 = y1 - y0,
-                x2_x0, y2_y0;
-            console.log(link);
-            if (y1_y0 === 0 || Math.abs(x1_x0 / y1_y0) > 1) {
-                y2_y0 = -distance;
-                x2_x0 = distance * y1_y0 / x1_x0;
-            } else {
-                x2_x0 = distance;
-                y2_y0 = distance * -x1_x0 / y1_y0;
-            }
-
-            return {
-                "source": {"x": x2_x0 + x0, "y": y2_y0 + y0},
-                "target": {"x": x2_x0 + x1, "y": y2_y0 + y1}
-            }
-
-        }
-    }
-
 </script>
