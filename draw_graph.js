@@ -32,15 +32,6 @@ $("#zoomout").on("click", function () {
     update();
 });
 
-// 保存svg到图片
-d3.select('#save').on('click', function () {
-    var svgString = getSVGString(svg.node());
-    svgString2Image(svgString, width, height, 'jpg', save); // passes Blob and filesize String to the callback
-
-    function save(dataBlob, filesize) {
-        saveAs(dataBlob, '企业关联关系图.jpg'); // FileSaver.js function
-    }
-});
 
 // 提交json文本
 // 注意，此处可能出现因浏览器不同而产生的无法工作的情况
