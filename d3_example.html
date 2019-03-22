@@ -59,36 +59,44 @@
 <div class="chart">
 </div>
 <div class="input_blank">
-    <h3>企业关联图谱</h3>
+    <br>
+    <h2>企业关联图谱</h2>
     <textarea placeholder="粘贴公司关联关系的.json文件" id="json"></textarea>
     <br>
     <br>
     <button onclick="submit_json()">提交</button>
+    <button id="reset">重置</button>
+    <br><br>
+    <button id="zoom">+</button>&nbsp;<button id="zoomout">-</button>
+    <br><br><br><br>
+    <button id="save">save as JPG</button>
 </div>
 </div>
 
-<!--导入d3及jquery包-->
+<!--在线导入d3及jquery包-->
 <script src="//d3js.org/d3.v3.min.js"></script>
 <script src="//code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="canvasjs.min.js"></script>
+<script src="//cdn.rawgit.com/eligrey/canvas-toBlob.js/f1a01896135ab378aa5c0118eadd81da55e698d8/canvas-toBlob.js"></script>
+<script src="//cdn.rawgit.com/eligrey/FileSaver.js/e9d941381475b5df8b7d7691013401e171014e89/FileSaver.min.js"></script>
+
+<!--离线使用d3及jquery-->
+<!--<script src="d3.min.js"></script>-->
+<!--<script src="jquery-3.3.1.min.js"></script>-->
 
 <script>
+
     // 设定窗口大小
     function settingwh(){
         let height = $(window).height();
         let width = $(window).width();
         $(".chart").width(width*0.8-20)
-            .outerHeight(height);
+            .height(height);
         $(".input_blank").width(width*0.19)
             .height(height);
     }
 
-    $(document).on("click", function (d) {
-        if (d.target.nodeName == "svg") {
-            $(".node, .link, .node_text, .link_text, g")
-                .attr("opacity", 1)
-                .removeClass("selected");
-        }
-    });
+    // 窗口大小自适应
     window.onload = function () {
         settingwh()
     };
@@ -96,12 +104,69 @@
         settingwh()
     });
 
+    // 单击空白处取消高亮选中结点
+    $(document).on("click", function (d) {
+        if (d.target.nodeName === "svg") {
+            $(".node, .link, .node_text, .link_text, g")
+                .attr("opacity", 1)
+                .removeClass("selected");
+        }
+    });
+
+    var width = 3000,
+        height = 3000,
+        radius = 35,
+        parallelDistance = 12,
+        font_size = 12,
+        cor_rescale = 3,
+        root;
+
+    var force = d3.layout.force()
+        .size([width, height])
+        .on("tick", tick)
+        .on("end",tick);    // tick一下完成所有结点的初始化
+
+    var svg = d3.select(".chart")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height),
+        container = svg.append('g'),
+        element = container.append('g');
+
+    var link = element.selectAll(".link"),
+        node = element.selectAll(".node"),
+        node_text = element.selectAll(".node_text"),
+        link_text = element.selectAll(".link_text");
+
+    $("#zoom").on("click",function () {
+        cor_rescale = cor_rescale +1;
+        update()
+    });
+    $("#zoomout").on("click",function () {
+        cor_rescale = cor_rescale - 1;
+        update();
+    });
+
+    // 保存svg到图片
+    d3.select('#save').on('click', function(){
+        var svgString = getSVGString(svg.node());
+        console.log(width, height);
+        svgString2Image( svgString, width, height, 'jpg', save ); // passes Blob and filesize String to the callback
+
+        function save( dataBlob, filesize ){
+            saveAs( dataBlob, '企业关联关系图.jpg' ); // FileSaver.js function
+        }
+    });
+
+    // 提交json文本
     function submit_json() {
         var text = $("textarea").val();
-        // console.log(text);
-        var json = JSON.parse(text);
+        root = JSON.parse(text);
 
-        update(json);
+        // 更新结点信息
+        update();
+
+        // svg居中展示
         let svg1 = $("svg")[0];
         console.log(svg1.attributes.width.value);
         console.log(svg1.clientWidth);
@@ -110,80 +175,47 @@
             .scrollTop(svg1.clientHeight/2 - 500)
     }
 
-    var width = 3000,
-        height = 3000,
-        radius = 35,
-        parallelDistance = 12,
-        angle = 10,
-        font_size = 12,
-        root;
-
-    // $('.chart').scrollTo(width/2,height/2);
-
-    var force = d3.layout.force()
-        .size([width, height])
-        .on("tick", tick)
-        .on("end",tick);
-
-    var svg = d3.select(".chart").append("svg")
-        .attr("width", width)
-        .attr("height", height);
-
-    var link = svg.selectAll(".link"),
-        node = svg.selectAll(".node"),
-        node_text = svg.selectAll(".node_text"),
-        link_text = svg.selectAll(".link_text");
-
-    // d3.json("large_size_with_cor.json", function (error, json) {
-    //     if (error) throw error;
-    //     root = json;
-    //
-    //     update();
-    // });
-
-    function update(root) {
+    // 更新svg信息
+    function update() {
+        // 初始化结点及边
         var nodes = root.nodes,
-            links = linkCount(root.links);
+            links = root.links;
+
+        // 设定结点位置
+        nodes = initNodes(nodes);
+        // 对边进行归类标注，连接同二结点的多条边
+        links = linkCount(links);
+
 
         // 启动force layout
         force
             .nodes(nodes)
             .links(links)
-            // .linkDistance(200)
-            // .charge(-1500)
             .start();
-
-        let n = nodes.length;
-        nodes.forEach(function (d, i) {
-            d.x = d.nodey * 3 + width*2 / 3;
-            d.y = d.nodex * 3 + height / 2;
-        });
 
         // 自定义拖拽函数
         var node_drag = d3.behavior.drag()
+            .origin(function (d) { return d })
             .on("dragstart", dragstart)
             .on("drag", dragmove)
             .on("dragend", dragend);
 
-        function dragstart(d, i) {
-            force.stop() // stops the force auto positioning before you start dragging
-        }
+        // 自定义缩放
+        var zoom = d3.behavior.zoom()
+            .translate([0,0])
+            .scaleExtent([0.1,10])    // 缩放比例范围
+            .scale(1)                // 缩放比例大小，默认值1
+            .on("zoom", zoomed);    // 缩放事件发生时执行zoomed();
 
-        function dragmove(d, i) {
-            d.px += d3.event.dx;
-            d.py += d3.event.dy;
-            d.x += d3.event.dx;
-            d.y += d3.event.dy;
-            tick(); // this is the key to make it work together with updating both px,py,x,y on d !
-        }
+        // 调用zoom
+        svg.call(zoom);
 
-        function dragend(d, i) {
-            d.fixed = true; // of course set the node to fixed so the force doesn't include the node in its auto positioning stuff
-            tick();
-        }
+        // 重置缩放
+        d3.select('#reset').on('click',function() {
+            svg.call(zoom.translate([0,0]).scale(1).event);
+        });
 
-
-        // 链
+        // 绘制边
         link = link.data(links);
         link.exit().remove();
         link.enter()
@@ -221,39 +253,24 @@
             .attr("text-anchor", "middle")
             .attr("pointer-events", "none")
             .attr("dominant-baseline", "middle")
-            .text(function (d) {
-                return d.relation
-            });
+            .text(function (d) { return d.relation });
         // 增加背景白块
         link_text.insert('rect', 'text')
-            .attr('width', function (d) {
-                return d.relation.length * 12
-            })
-            .attr('height', function (d) {
-                return 12
-            })
+            .attr('width', function (d) { return d.relation.length * 12 })
+            .attr('height', function (d) { return 12 })
             .attr("y", "-.5em")
-            .attr('x', function (d) {
-                return -d.relation.length * 12 / 2
-            })
+            .attr('x', function (d) { return -d.relation.length * 12 / 2 })
             .style('fill', '#FFFFFF');
 
 
-        // 结点
-        node = node.data(nodes, function (d) {
-            return d.id
-        }).style("fill", color);
+        // 绘制结点
+        node = node.data(nodes, function (d) { return d.id });
         node.exit().remove();
         node.enter()
             .append("circle")
             .attr("class", "node")
-            // .attr("class", "rect")
-            .attr("cx", function (d) {
-                return d.x;
-            })    // cx define the x-axis of a center point
-            .attr("cy", function (d) {
-                return d.y;
-            })    // cy define the y-axis ..
+            .attr("cx", function (d) { return d.x })    // cx define the x-axis of a center point
+            .attr("cy", function (d) { return d.y })    // cy define the y-axis ..
             .attr("r", radius + "px")   // define the radius
             .style("fill", color)
             .on("click", click)
@@ -270,12 +287,8 @@
             // .attr("text-anchor", "middle")  // 使文本水平居中而非左对齐
             .attr("dominant-baseline", "middle")
             .attr("pointer-events", "none")
-            .attr("x", function (d) {
-                return d.x
-            })
-            .attr("y", function (d) {
-                return d.y
-            })
+            .attr("x", function (d) { return d.x })
+            .attr("y", function (d) { return d.y })
             .attr("x", function (d) {
                 if (d.name.length <= 5) {
                     d3.select(this).append('tspan')
@@ -314,6 +327,8 @@
                 }
             });
 
+
+        // 完成绘制自动停止force layout以保证结点位置与设定位置相同
         force.stop()
     }
 
@@ -364,7 +379,6 @@
 
     // 点击结点时淡化不相邻的点及边
     function click(d) {
-        // if (!d3.event.defaultPrevented) {
         var thisNode = d.id;
         var connected = root.links.filter(function (e) {
             return e.source.id === thisNode || e.target.id === thisNode
@@ -391,8 +405,6 @@
             return (d.source.id == thisNode || d.target.id == thisNode) ? 1 : 0.1
         })
     }
-
-    // }
 
     // 给link排序，先按source 再按target
     function sortLinks(links) {
@@ -492,6 +504,140 @@
         }
     }
 
+    // 初始化结点位置
+    function initNodes(nodes){
+        nodes.forEach(function (d, i) {
+            d.x = d.nodey * cor_rescale + width*2 / 3;
+            d.y = d.nodex * cor_rescale + height / 2;
+        });
+        return nodes
+    }
 
+    // 自定义拖拽函数
+    function dragstart(d, i) {
+        event.stopPropagation();
+    }
+    function dragmove(d, i) {
+        d.px += d3.event.dx;
+        d.py += d3.event.dy;
+        d.x += d3.event.dx;
+        d.y += d3.event.dy;
+        tick(); // this is the key to make it work together with updating both px,py,x,y on d !
+    }
+    function dragend(d, i) {
+        d.fixed = true; // of course set the node to fixed so the force doesn't include the node in its auto positioning stuff
+        tick();
+    }
+
+    // 自定义缩放函数
+    function zoomed() {
+        event.stopPropagation();
+        container.attr(
+            "transform",
+            "translate(" + d3.event.translate + ") " +
+            "scale(" + d3.event.scale + ")"
+        );
+    }
+
+    // Below are the functions that handle actual exporting:
+    // getSVGString ( svgNode ) and svgString2Image( svgString, width, height, format, callback )
+    function getSVGString( svgNode ) {
+        svgNode.setAttribute('xlink', 'http://www.w3.org/1999/xlink');
+        var cssStyleText = getCSSStyles( svgNode );
+        appendCSS( cssStyleText, svgNode );
+
+        var serializer = new XMLSerializer();
+        var svgString = serializer.serializeToString(svgNode);
+        svgString = svgString.replace(/(\w+)?:?xlink=/g, 'xmlns:xlink='); // Fix root xlink without namespace
+        svgString = svgString.replace(/NS\d+:href/g, 'xlink:href'); // Safari NS namespace fix
+
+        return svgString;
+
+        function getCSSStyles( parentElement ) {
+            var selectorTextArr = [];
+
+            // Add Parent element Id and Classes to the list
+            selectorTextArr.push( '#'+parentElement.id );
+            for (var c = 0; c < parentElement.classList.length; c++)
+                if ( !contains('.'+parentElement.classList[c], selectorTextArr) )
+                    selectorTextArr.push( '.'+parentElement.classList[c] );
+
+            // Add Children element Ids and Classes to the list
+            var nodes = parentElement.getElementsByTagName("*");
+            for (var i = 0; i < nodes.length; i++) {
+                var id = nodes[i].id;
+                if ( !contains('#'+id, selectorTextArr) )
+                    selectorTextArr.push( '#'+id );
+
+                var classes = nodes[i].classList;
+                for (var c = 0; c < classes.length; c++)
+                    if ( !contains('.'+classes[c], selectorTextArr) )
+                        selectorTextArr.push( '.'+classes[c] );
+            }
+
+            // Extract CSS Rules
+            var extractedCSSText = "";
+            for (var i = 0; i < document.styleSheets.length; i++) {
+                var s = document.styleSheets[i];
+
+                try {
+                    if(!s.cssRules) continue;
+                } catch( e ) {
+                    if(e.name !== 'SecurityError') throw e; // for Firefox
+                    continue;
+                }
+
+                var cssRules = s.cssRules;
+                for (var r = 0; r < cssRules.length; r++) {
+                    if ( contains( cssRules[r].selectorText, selectorTextArr ) )
+                        extractedCSSText += cssRules[r].cssText;
+                }
+            }
+
+
+            return extractedCSSText;
+
+            function contains(str,arr) {
+                return arr.indexOf( str ) === -1 ? false : true;
+            }
+
+        }
+
+        function appendCSS( cssText, element ) {
+            var styleElement = document.createElement("style");
+            styleElement.setAttribute("type","text/css");
+            styleElement.innerHTML = cssText;
+            var refNode = element.hasChildNodes() ? element.children[0] : null;
+            element.insertBefore( styleElement, refNode );
+        }
+    }
+
+    function svgString2Image( svgString, width, height, format, callback ) {
+        var format = format ? format : 'jpg';
+
+        var imgsrc = 'data:image/svg+xml;base64,'+ btoa( unescape( encodeURIComponent( svgString ) ) ); // Convert SVG string to data URL
+
+        var canvas = document.createElement("canvas");
+        var context = canvas.getContext("2d");
+
+        canvas.width = width;
+        canvas.height = height;
+
+        context.fillStyle = '#FFFFFF';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        var image = new Image();
+        image.onload = function() {
+            // context.clearRect ( 0, 0, width, height );
+            context.drawImage(image, 0, 0, width, height);
+
+            canvas.toBlob( function(blob) {
+                var filesize = Math.round( blob.length/1024 ) + ' KB';
+                if ( callback ) callback( blob, filesize );
+            });
+        };
+
+        image.src = imgsrc;
+    }
 </script>
 </body>
