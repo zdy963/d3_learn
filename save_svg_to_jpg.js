@@ -105,8 +105,8 @@ function svgString2Image(svgString, width, height, format, callback) {
             tOffset = canvas.height,
             bOffset = 0;
 
-        for (let i = 0; i < canvas.width; i++) {
-            for (let j = 0; j < canvas.height; j++) {
+        for (let i = 0; i < canvas.width; i+=20) {
+            for (let j = 0; j < canvas.height; j+=20) {
                 var pos = (i + canvas.width * j) * 4;
                 if (imgData[pos] == 255 || imgData[pos + 1] == 255 || imgData[pos + 2] == 255 || imgData[pos + 3] == 255) {
                     bOffset = Math.max(j, bOffset); // 找到有色彩的最下端
@@ -123,11 +123,11 @@ function svgString2Image(svgString, width, height, format, callback) {
 
         let canvas2 = document.createElement("canvas"),
             context2 = canvas2.getContext("2d");
-        canvas2.width = rOffset-lOffset+100;
-        canvas2.height = bOffset-tOffset+100;
+        canvas2.width = rOffset-lOffset+160;
+        canvas2.height = bOffset-tOffset+160;
         context2.fillStyle = '#FFFFFF';
         context2.fillRect(0, 0, canvas2.width, canvas2.height);
-        context2.drawImage(image, lOffset-50, tOffset-50, canvas2.width, canvas2.height,
+        context2.drawImage(image, lOffset-80, tOffset-80, canvas2.width, canvas2.height,
             0, 0, canvas2.width, canvas2.height);
 
         // 到处图片到Blob（我也不知道是什么其实

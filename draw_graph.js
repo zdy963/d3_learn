@@ -1,27 +1,35 @@
-var width = 3000,
-    height = 3000,
+var width = 10000,
+    height = 10000,
     radius = 35,
     parallelDistance = 12,
     font_size = 12,
     cor_rescale = 3,
+    origin_scale = 3,
+    node_stoke = 10,
+    link_stoke = 3,
     root;
 
 var force = d3.layout.force()
     .size([width, height])
+    .linkDistance(function (d) {
+        let node_degree = Math.max(d.target.degree, d.source.degree);
+        let base_dis = 1 / node_degree;
+        let base_var = Math.sqrt(node_degree*1.8) * (Math.random());
+        // console.log("degree",node_degree);
+        if(d.source.type === d.target.type){
+            return radius * 5 * base_dis
+        } else {
+            // console.log("diff");
+            return radius * (3 + base_var + 3 * base_dis)
+        }
+    })
+    .chargeDistance(1500)
+    .charge(-200)
+    .gravity(0.02)
     .on("tick", tick)
     .on("end", tick);    // tick一下完成所有结点的初始化
 
-var svg = d3.select(".chart")
-        .append("svg")
-        .attr("width", width)
-        .attr("height", height),
-    container = svg.append('g'),
-    element = container.append('g');
-
-var link = element.selectAll(".link"),
-    node = element.selectAll(".node"),
-    node_text = element.selectAll(".node_text"),
-    link_text = element.selectAll(".link_text");
+// update();
 
 $("#zoom").on("click", function () {
     cor_rescale = cor_rescale + 1;
@@ -30,6 +38,11 @@ $("#zoom").on("click", function () {
 $("#zoomout").on("click", function () {
     cor_rescale = cor_rescale - 1;
     update();
+});
+$("#start_force").on("click", function () {
+    force.resume();
+    console.log("Starting force layout");
+    // force.stop()
 });
 
 
@@ -40,6 +53,22 @@ function submit_json() {
     var text = $("textarea").val();
     root = JSON.parse(text);
 
+    // window.location.reload();
+    d3.select('.chart svg').remove();
+
+    svg = d3.select(".chart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+    container = svg.append('g');
+    element = container.append('g');
+
+    link = element.selectAll(".link");
+    node = element.selectAll(".node");
+    node_text = element.selectAll(".node_text");
+    link_text = element.selectAll(".link_text");
+
+    cor_rescale = origin_scale;
     // 更新结点信息
     update();
 
@@ -51,14 +80,18 @@ function submit_json() {
 
 // 更新svg信息
 function update() {
+
     // 初始化结点及边
     var nodes = root.nodes,
         links = root.links;
 
     // 设定结点位置
     nodes = initNodes(nodes);
+
     // 对边进行归类标注，连接同二结点的多条边
-    links = linkCount(links);
+    let data = linkCount(links,nodes);
+    links = data[0];
+    nodes = data[1];
 
 
     // 启动force layout
@@ -69,9 +102,7 @@ function update() {
 
     // 自定义拖拽函数
     var node_drag = d3.behavior.drag()
-        .origin(function (d) {
-            return d
-        })
+        .origin(function (d) { return d })
         .on("dragstart", dragstart)
         .on("drag", dragmove)
         .on("dragend", dragend);
@@ -97,6 +128,8 @@ function update() {
     link.enter()
         .append("path")
         .attr("class", "link")
+        .attr("stroke-width",link_stoke)
+        .attr("stroke",function (d) { return d.color ? d.color : "#9ecae1"; })
         .attr("marker-end", function (d, i) {
             var arrowMarker = svg.append("marker")
                 .attr("id", "arrow" + i)
@@ -104,14 +137,12 @@ function update() {
                 .attr("markerWidth", "16")
                 .attr("markerHeight", "15")
                 .attr("viewBox", "0 0 10 10")
-                .attr("refX", radius)
+                .attr("refX", radius*0.9)
                 .attr("refY", 6)
                 .attr("orient", "auto")
                 .append("svg:path")
                 .attr("d", "M2,2 L10,6 L2,10 L6,6 L2,2")
-                .attr("fill", function () {
-                    return d.lineColor = "" ? lineColor : "#9ecae1";
-                });
+                .attr("fill", function () { return d.color ? d.color : "#9ecae1"; });
 
             return "url(#arrow" + i + ")";
         });
@@ -126,41 +157,31 @@ function update() {
     // 增加文本
     link_text.append("svg:text")
         .attr("class", "link_text")
+        .attr("font-size", font_size)
         .attr("text-anchor", "middle")
         .attr("pointer-events", "none")
         .attr("dominant-baseline", "middle")
-        .text(function (d) {
-            return d.relation
-        });
+        .text(function (d) { return d.relation });
     // 增加背景白块
     link_text.insert('rect', 'text')
-        .attr('width', function (d) {
-            return d.relation.length * 12
-        })
-        .attr('height', function (d) {
-            return 12
-        })
+        .attr('width', function (d) { return d.relation.length * font_size })
+        .attr('height', function (d) { return font_size })
         .attr("y", "-.5em")
-        .attr('x', function (d) {
-            return -d.relation.length * 12 / 2
-        })
+        .attr('x', function (d) { return -d.relation.length * font_size / 2 })
         .style('fill', '#FFFFFF');
 
 
     // 绘制结点
-    node = node.data(nodes, function (d) {
-        return d.id
-    });
+    node = node.data(nodes, function (d) { return d.id });
     node.exit().remove();
     node.enter()
         .append("circle")
         .attr("class", "node")
-        .attr("cx", function (d) {
-            return d.x
-        })    // cx define the x-axis of a center point
-        .attr("cy", function (d) {
-            return d.y
-        })    // cy define the y-axis ..
+        .attr("stroke-width", node_stoke)
+        .attr("stroke", color)
+        .attr("stroke-opacity", 0.6)
+        .attr("cx", function (d) { return d.x })    // cx define the x-axis of a center point
+        .attr("cy", function (d) { return d.y })    // cy define the y-axis ..
         .attr("r", radius + "px")   // define the radius
         .style("fill", color)
         .on("click", click)
@@ -177,12 +198,8 @@ function update() {
         // .attr("text-anchor", "middle")  // 使文本水平居中而非左对齐
         .attr("dominant-baseline", "middle")
         .attr("pointer-events", "none")
-        .attr("x", function (d) {
-            return d.x
-        })
-        .attr("y", function (d) {
-            return d.y
-        })
+        .attr("x", function (d) { return d.x })
+        .attr("y", function (d) { return d.y })
         .attr("x", function (d) {
             if (d.name.length <= 5) {
                 d3.select(this).append('tspan')
@@ -257,17 +274,48 @@ function tick() {
 function color(d) {
     // colors: 3182bd: dark blue, c6dbef: light blue, fd8d3c: orange
     let fill_color;
-    switch (d.type) {
-        case 0:     // central node
-            fill_color = "#C6DBEF";
-            break;
-        case 2:     // person
-            fill_color = "#FD8D3C";
-            break;
-        case 1:     // company
-            fill_color = "#3182DB";
-            break;
+    if (d.hasOwnProperty("color")){
+        fill_color = d.color;
+    } else {
+        switch (d.type) {
+            case 0:     // central node
+                fill_color = "#C6DBEF";
+                break;
+            case 2:     // person
+                fill_color = "#FD8D3C";
+                break;
+            case 1:     // company
+                fill_color = "#3182DB";
+                break;
+        }
     }
+
+    d.color = fill_color;
+    return fill_color;
+}
+
+// 边上色
+function links_color(d) {
+    // colors: 3182bd: dark blue, c6dbef: light blue, fd8d3c: orange
+    let fill_color;
+    console.log(d);
+    if (d.hasOwnProperty("color")){
+        fill_color = d.color;
+    } else {
+        switch (d.source.type) {
+            case 0:     // central node
+                fill_color = "#C6DBEF";
+                break;
+            case 2:     // person
+                fill_color = "#FD8D3C";
+                break;
+            case 1:     // company
+                fill_color = "#3182DB";
+                break;
+        }
+    }
+
+    d.color = fill_color;
     return fill_color;
 }
 
@@ -306,52 +354,100 @@ function click(d) {
 
 // 给link排序，先按source 再按target
 function sortLinks(links) {
-    links.sort(function (a, b) {
-        if (a.source > b.source) {
-            return 1;
-        } else if (a.source < b.source) {
-            return -1;
-        } else {
-            if (a.target > b.target) {
+    if(links[0].source.hasOwnProperty("id")) {
+        links.sort(function (a, b) {
+            if (a.source.id > b.source.id) {
                 return 1;
-            }
-            if (a.target < b.target) {
+            } else if (a.source.id < b.source.id) {
                 return -1;
             } else {
-                return 0;
+                if (a.target.id > b.target.id) {
+                    return 1;
+                }
+                if (a.target.id < b.target.id) {
+                    return -1;
+                } else {
+                    return 0;
+                }
             }
-        }
-    });
+        });
+    } else {
+        links.sort(function (a, b) {
+            if (a.source > b.source) {
+                return 1;
+            } else if (a.source < b.source) {
+                return -1;
+            } else {
+                if (a.target > b.target) {
+                    return 1;
+                }
+                if (a.target < b.target) {
+                    return -1;
+                } else {
+                    return 0;
+                }
+            }
+        });
+    }
     return links;
 }
 
 // 标注边的数量
-function linkCount(links) {
+function linkCount(links,nodes) {
     links = sortLinks(links);
-    for (let i = 0; i < links.length; i++) {
-        if (i != 0 && links[i].source == links[i - 1].source &&
-            links[i].target == links[i - 1].target) {
-            links[i].linknum = links[i - 1].linknum + 1;
-        } else {
-            links[i].linknum = 0;
-            if (i > 1 && links[i - 1].linknum > 0) {
-                // 更新上群结点信息
-                let mid_num = (links[i - 1].linknum) / 2;
-                let ir = links[i - 1].linknum + 1;
-                for (let j = 0; j < ir; j++) {
-                    links[i - 1 - j].linknum = mid_num - j
+    if(links[0].source.hasOwnProperty("id")){
+        for (let i = 0; i < links.length; i++) {
+            // 连接计数
+            if (i != 0 && links[i].source.id == links[i - 1].source.id &&
+                links[i].target.id == links[i - 1].target.id) {
+                links[i].linknum = links[i - 1].linknum + 1;
+            } else {
+                // 统计结点的度 对于同源同根只计作一个
+                nodes[links[i].target.id].degree += 1;
+                nodes[links[i].source.id].degree += 1;
+                links[i].linknum = 0;
+                if (i > 1 && links[i - 1].linknum > 0) {
+                    // 更新上群结点信息
+                    let mid_num = (links[i - 1].linknum) / 2;
+                    let ir = links[i - 1].linknum + 1;
+                    for (let j = 0; j < ir; j++) {
+                        links[i - 1 - j].linknum = mid_num - j
+                    }
                 }
             }
         }
     }
-    if (links[links.length - 1].linknum > 0) {
-        let mid_num = (links[links.length - 1].linknum + 1) / 2;
-        let ir = links[links.length - 1].linknum + 1;
-        for (let j = 0; j < ir; j++) {
-            links[links.length - 1 - j].linknum = Math.abs(mid_num - j);
+    else {
+        for (let i = 0; i < links.length; i++) {
+            // 连接计数
+            if (i != 0 && links[i].source == links[i - 1].source &&
+                links[i].target == links[i - 1].target) {
+                links[i].linknum = links[i - 1].linknum + 1;
+            } else {
+                // 统计结点的度 对于同源同根只计作一个
+                nodes[links[i].target].degree += 1;
+                nodes[links[i].source].degree += 1;
+                links[i].linknum = 0;
+                if (i > 1 && links[i - 1].linknum > 0) {
+                    // 更新上群结点信息
+                    let mid_num = (links[i - 1].linknum) / 2;
+                    let ir = links[i - 1].linknum + 1;
+                    for (let j = 0; j < ir; j++) {
+                        links[i - 1 - j].linknum = mid_num - j
+                    }
+                }
+            }
         }
     }
-    return links
+
+    if (links[links.length - 1].linknum > 0) {
+        let mid_num = (links[links.length - 1].linknum) / 2;
+        let ir = links[links.length - 1].linknum + 1;
+        for (let j = 0; j <= ir; j++) {
+            links[links.length - 1 - j].linknum = mid_num - j;
+        }
+    }
+    return [links,nodes]
 }
 
 // 多条links --采用线段间距离
@@ -405,8 +501,10 @@ function multiLinks(d) {
 // 初始化结点位置
 function initNodes(nodes) {
     nodes.forEach(function (d, i) {
-        d.x = d.nodey * cor_rescale + width * 2 / 3;
+        d.x = d.nodey * cor_rescale + width /2;
         d.y = d.nodex * cor_rescale + height / 2;
+        // 初始化结点的度
+        d.degree = 0;
     });
     return nodes
 }
