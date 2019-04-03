@@ -9,25 +9,44 @@ var width = 10000,
     link_stoke = 3,
     root;
 
-var force = d3.layout.force()
-    .size([width, height])
-    .linkDistance(function (d) {
-        let node_degree = Math.max(d.target.degree, d.source.degree);
-        let base_dis = 1 / node_degree;
-        let base_var = Math.sqrt(node_degree*1.8) * (Math.random());
-        // console.log("degree",node_degree);
-        if(d.source.type === d.target.type){
-            return radius * 5 * base_dis
-        } else {
-            // console.log("diff");
-            return radius * (3 + base_var + 3 * base_dis)
-        }
-    })
-    .chargeDistance(1500)
-    .charge(-200)
-    .gravity(0.02)
-    .on("tick", tick)
-    .on("end", tick);    // tick一下完成所有结点的初始化
+var force;
+
+function init_force() {
+    d3.selectAll("svg").remove();
+
+    svg = d3.select(".chart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+    container = svg.append('g');
+    element = container.append('g');
+    force = d3.layout.force()
+        .size([width, height])
+        .linkDistance(function (d) {
+            let node_degree = Math.max(d.target.degree, d.source.degree);
+            let base_dis = 1 / node_degree;
+            let base_var = Math.sqrt(node_degree*1.8) * (Math.random());
+            // console.log("degree",node_degree);
+            if(d.source.type === d.target.type){
+                return radius * 5 * base_dis
+            } else {
+                // console.log("diff");
+                return radius * (3 + base_var + 3 * base_dis)
+            }
+        })
+        .chargeDistance(1500)
+        .charge(-200)
+        .gravity(0.02)
+        .on("tick", tick)
+        .on("end", tick);    // tick一下完成所有结点的初始化
+
+    link = element.selectAll(".link");
+    node = element.selectAll(".node");
+    node_text = element.selectAll(".node_text");
+    link_text = element.selectAll(".link_text");
+}
+
+init_force();
 
 // update();
 
@@ -39,10 +58,18 @@ $("#zoomout").on("click", function () {
     cor_rescale = cor_rescale - 1;
     update();
 });
+$("#reset_zoom").on("click", function () {
+    $("#range").val(3);
+    cor_rescale = 3;
+    update();
+});
 $("#start_force").on("click", function () {
-    force.resume();
+    force.start();
     console.log("Starting force layout");
     // force.stop()
+});
+$("#stop_force").on("click", function () {
+    force.stop()
 });
 
 
@@ -56,18 +83,6 @@ function submit_json() {
     // window.location.reload();
     d3.select('.chart svg').remove();
 
-    svg = d3.select(".chart")
-        .append("svg")
-        .attr("width", width)
-        .attr("height", height);
-    container = svg.append('g');
-    element = container.append('g');
-
-    link = element.selectAll(".link");
-    node = element.selectAll(".node");
-    node_text = element.selectAll(".node_text");
-    link_text = element.selectAll(".link_text");
-
     cor_rescale = origin_scale;
     // 更新结点信息
     update();
@@ -80,7 +95,7 @@ function submit_json() {
 
 // 更新svg信息
 function update() {
-
+    init_force();
     // 初始化结点及边
     var nodes = root.nodes,
         links = root.links;
@@ -149,26 +164,28 @@ function update() {
 
 
     // 在链上写结点间的关系
-    link_text = link_text.data(links);
-    link_text.exit().remove();
-    link_text.enter()
-        .append("svg:g")
-        .attr("fill-opacity", 1);
-    // 增加文本
-    link_text.append("svg:text")
-        .attr("class", "link_text")
-        .attr("font-size", font_size)
-        .attr("text-anchor", "middle")
-        .attr("pointer-events", "none")
-        .attr("dominant-baseline", "middle")
-        .text(function (d) { return d.relation });
-    // 增加背景白块
-    link_text.insert('rect', 'text')
-        .attr('width', function (d) { return d.relation.length * font_size })
-        .attr('height', function (d) { return font_size })
-        .attr("y", "-.5em")
-        .attr('x', function (d) { return -d.relation.length * font_size / 2 })
-        .style('fill', '#FFFFFF');
+    if(links[1]['relation']){
+        link_text = link_text.data(links);
+        link_text.exit().remove();
+        link_text.enter()
+            .append("svg:g")
+            .attr("fill-opacity", 1);
+        // 增加文本
+        link_text.append("svg:text")
+            .attr("class", "link_text")
+            .attr("font-size", font_size)
+            .attr("text-anchor", "middle")
+            .attr("pointer-events", "none")
+            .attr("dominant-baseline", "middle")
+            .text(function (d) { return d.relation });
+        // 增加背景白块
+        link_text.insert('rect', 'text')
+            .attr('width', function (d) { return d.relation.length * font_size })
+            .attr('height', function (d) { return font_size })
+            .attr("y", "-.5em")
+            .attr('x', function (d) { return -d.relation.length * font_size / 2 })
+            .style('fill', '#FFFFFF');
+    }
 
 
     // 绘制结点

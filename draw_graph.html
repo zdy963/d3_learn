@@ -4,14 +4,10 @@
 <style>
     .node {
         cursor: pointer;
-        /*stroke: #3182bd;*/
-        /*stroke-width: 1.5px;*/
     }
 
     .link {
         fill: none;
-        /*stroke: #9ecae1;*/
-        /*stroke-width: 3px;*/
     }
 
     .node_text {
@@ -28,8 +24,11 @@
     }
 
     .chart{
-        overflow:scroll;
+        overflow:hidden;
         float: left;
+        border-style: solid;
+        border-color: darkgrey;
+        border-width: 5px;
     }
 
     .input_blank{
@@ -38,8 +37,16 @@
 
     textarea{
         height: 60%;
-        width: 90%;
+        width: 85%;
         overflow:auto;
+        margin-left: 5%;
+    }
+    input[type=text]{
+        width: 20%;
+        margin-left: 5%;
+    }
+    input[type=range]{
+        width: 60%;
     }
 
 </style>
@@ -52,14 +59,18 @@
         <h2>企业关联图谱</h2>
         <textarea placeholder="请在此粘贴公司关联关系的.json文件" id="json"></textarea>
         <br><br>
-
-        <button onclick="submit_json()">提交.JSON</button>
-        <br><br>
-        <button id="zoom">&nbsp;&nbsp;+&nbsp;&nbsp;</button>&nbsp;&nbsp;<button id="zoomout">&nbsp;&nbsp;-&nbsp;&nbsp;</button>&nbsp;&nbsp;结点距离调整
+        <button onclick="submit_json()">提交</button>
         <br><br>
 
-        <button id="start_force">启动力布局</button>
+        <button id="start_force">启动力布局</button>&nbsp;&nbsp;<button id="stop_force">停止力布局</button>
         <br><br>
+
+        <label>
+            <input type="range" min="-50" max="50" value="0" id="range" oninput="getRange()">
+        </label>&nbsp;&nbsp;
+        <button id="reset_zoom">重置缩放</button>
+        <br><br>
+
 
         <button id="save">保存到JPG</button>&nbsp;&nbsp;点击后请等待
     </div>
@@ -67,13 +78,13 @@
 
 <!--在线导入d3及jquery包-->
 <script src="//d3js.org/d3.v3.min.js"></script>
-<script src="//code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="//code.jquery.com/jquery-1.9.1.js"></script>
 
-<script src="canvasjs.min.js"></script>
 <script src="//cdn.rawgit.com/eligrey/canvas-toBlob.js/f1a01896135ab378aa5c0118eadd81da55e698d8/canvas-toBlob.js"></script>
 <script src="//cdn.rawgit.com/eligrey/FileSaver.js/e9d941381475b5df8b7d7691013401e171014e89/FileSaver.min.js"></script>
 
+<!--<script src="window_size_setting.js"></script>-->
 <script src="window_size_setting.js"></script>
-<script src="save_svg_to_jpg.js"></script>
 <script src="draw_graph.js"></script>
+<script src="save_svg_to_jpg.js"></script>
 </body>
